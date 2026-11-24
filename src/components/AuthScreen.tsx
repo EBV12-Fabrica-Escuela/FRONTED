@@ -154,16 +154,31 @@ export function getAccountUser(email: string): AuthUser | null {
   }
 }
 
-export function updateManagedAccountRole(
-  email: string,
-  role: UserRole,
-): { user?: AuthUser; error?: string } {
+export function updateManagedAccountRole(email: string, role: UserRole): {
+  user?: AuthUser
+  error?: string
+} {
   if (!["client", "provider", "admin"].includes(role)) {
     return { error: "El rol seleccionado no existe." }
   }
 
   const account = findAccount(email)
   if (!account) return { error: "El usuario que intentas modificar no existe." }
+
+  const activeAdministrators = getManagedAccounts().filter(
+    (managedAccount) =>
+      managedAccount.enabled && hasUserRole(managedAccount, "admin"),
+  )
+  if (
+    hasUserRole(account, "admin") &&
+    role !== "admin" &&
+    activeAdministrators.length <= 1
+  ) {
+    return {
+      error:
+        "No puedes retirar este rol porque el sistema debe conservar al menos un administrador activo.",
+    }
+  }
 
   const normalizedEmail = email.trim().toLowerCase()
   const updatedAccount: PrototypeAccount = {
@@ -193,6 +208,18 @@ export function updateManagedAccountRole(
 export function deleteManagedAccount(email: string): string | null {
   const account = findAccount(email)
   if (!account) return "El usuario que intentas eliminar no existe."
+
+  const activeAdministrators = getManagedAccounts().filter(
+    (managedAccount) =>
+      managedAccount.enabled && hasUserRole(managedAccount, "admin"),
+  )
+  if (
+    account.enabled &&
+    hasUserRole(account, "admin") &&
+    activeAdministrators.length <= 1
+  ) {
+    return "No puedes eliminar este acceso porque el sistema debe conservar al menos un administrador activo."
+  }
 
   const normalizedEmail = email.trim().toLowerCase()
   const isPrototypeAccount = PROTOTYPE_ACCOUNTS.some(
@@ -226,7 +253,10 @@ export interface AccountProfileInput {
 export function updateAccountProfile(
   currentEmail: string,
   profile: AccountProfileInput,
-): { user?: AuthUser; error?: string } {
+): {
+  user?: AuthUser
+  error?: string
+} {
   const account = findAccount(currentEmail)
   if (!account) return { error: "No fue posible encontrar la cuenta." }
 
@@ -344,7 +374,7 @@ export default function AuthScreen({
       if (!name.trim()) errs.name = "El nombre completo es obligatorio"
       if (!phone.trim()) errs.phone = "El número de celular es obligatorio"
       if (!registrationRole)
-        errs.role = "Selecciona si tu cuenta es de cliente o proveedor"
+        errs.role = "Selecciona el tipo de cuenta que deseas crear"
       if (
         password &&
         (password.length < 8 ||
@@ -688,9 +718,11 @@ export default function AuthScreen({
                   Ya puedes continuar
                 </p>
                 <p className="text-sm text-green-700">
-                  {registrationRole === "provider"
-                    ? "Tu cuenta de proveedor está lista. Puedes reservar servicios como cliente y administrar tus propios servicios desde el panel."
-                    : "Continúa con tu reserva usando la cuenta que acabas de crear. También podrás iniciar sesión más adelante con tu correo y contraseña."}
+                  {registrationRole === "admin"
+                    ? "Tu cuenta de administrador está lista. Puedes gestionar usuarios, roles y permisos desde el panel administrativo."
+                    : registrationRole === "provider"
+                      ? "Tu cuenta de proveedor está lista. Puedes reservar servicios como cliente y administrar tus propios servicios desde el panel."
+                      : "Continúa con tu reserva usando la cuenta que acabas de crear. También podrás iniciar sesión más adelante con tu correo y contraseña."}
                 </p>
               </div>
               <button
@@ -709,9 +741,11 @@ export default function AuthScreen({
               >
                 {service
                   ? "Continuar con mi reserva →"
-                  : registrationRole === "provider"
-                    ? "Ir al panel de proveedor →"
-                    : "Ir al catálogo →"}
+                  : registrationRole === "admin"
+                    ? "Ir al panel administrativo →"
+                    : registrationRole === "provider"
+                      ? "Ir al panel de proveedor →"
+                      : "Ir al catálogo →"}
               </button>
               <button
                 type="button"
@@ -891,6 +925,7 @@ export default function AuthScreen({
                       <option value="">Selecciona el tipo de cuenta</option>
                       <option value="client">Cliente</option>
                       <option value="provider">Proveedor</option>
+                      <option value="admin">Administrador</option>
                     </select>
                     {errors.role ? (
                       <p
@@ -905,8 +940,8 @@ export default function AuthScreen({
                         id="registration-role-help"
                         className="mt-1.5 text-xs text-gray-500"
                       >
-                        Las cuentas de proveedor pueden crear servicios y
-                        configurar horarios.
+                        El tipo de cuenta define los permisos iniciales dentro
+                        de la plataforma.
                       </p>
                     )}
                   </div>

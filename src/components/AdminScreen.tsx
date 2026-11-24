@@ -7,7 +7,11 @@ interface Props {
   onDelete: (email: string) => string | null
 }
 
-type PendingAction = { type: "role"; account: ManagedAccount; role: UserRole } | {
+type PendingAction = {
+  type: "role"
+  account: ManagedAccount
+  role: UserRole
+} | {
   type: "delete"
   account: ManagedAccount
 }

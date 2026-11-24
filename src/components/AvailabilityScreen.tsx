@@ -181,7 +181,11 @@ function getAgendaSlotStatus(
   bookings: Booking[],
   date: Date,
   time: string,
-): { status: AgendaSlotStatus; reason?: string; specificBlock?: BlockedSlot } {
+): {
+  status: AgendaSlotStatus
+  reason?: string
+  specificBlock?: BlockedSlot
+} {
   const dateKey = formatDateKey(date)
   const slotStart = displayTimeToMinutes(time)
   const slotDate = new Date(date)
